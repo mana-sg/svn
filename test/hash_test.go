@@ -3,7 +3,7 @@ package test
 import (
 	"testing"
 
-	"github.com/mana-sg/vcs/utils"
+	"github.com/mana-sg/vcs/internal/utils"
 )
 
 func TestHasher(t *testing.T) {

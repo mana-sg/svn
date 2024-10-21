@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/mana-sg/vcs/utils"
+	"github.com/mana-sg/vcs/internal/db"
 )
 
 func TestDatabaseConnection(t *testing.T) {
@@ -15,7 +15,7 @@ func TestDatabaseConnection(t *testing.T) {
 	host := os.Getenv("DATABASE_HOST")
 	dbname := os.Getenv("DATABASE_NAME")
 
-	dbcf := utils.DbHandler{}
+	dbcf := db.DbHandler{}
 
 	err := dbcf.ConfigDB(user, password, host, dbname)
 	if err != nil {
