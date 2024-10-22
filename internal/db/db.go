@@ -83,11 +83,15 @@ func (d *DbHandler) PrepareDb() error {
       id INT AUTO_INCREMENT PRIMARY KEY,
       message VARCHAR(255) NOT NULL,
       timeStamp DATETIME NOT NULL
+      repoId INT NOT NULL,
+      FOREIGN KEY (repoId) REFERENCES vcs.repo(id)
     );`,
 		`CREATE TABLE IF NOT EXISTS repo(
       id INT AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
       timeCreation DATETIME NOT NULL 
+      userId INT,
+      FOREIGN KEY (userId) REFERENCES vcs.users(id)
     );`,
 		`CREATE TABLE IF NOT EXISTS tree(
       hash VARCHAR(64) NOT NULL PRIMARY KEY 
