@@ -95,6 +95,8 @@ func (d *DbHandler) PrepareDb() error {
     );`,
 		`CREATE TABLE IF NOT EXISTS tree(
       hash VARCHAR(64) NOT NULL PRIMARY KEY 
+      tree_entry VARCHAR(64) NOT NULL,
+      FOREIGN KEY (tree_entry) references vcs.tree_entry(hash)
     );`,
 		`CREATE TABLE IF NOT EXISTS blobContent(
       hash VARCHAR(64) NOT NULL PRIMARY KEY,
@@ -103,7 +105,8 @@ func (d *DbHandler) PrepareDb() error {
 		`CREATE TABLE IF NOT EXISTS tree_entry(
       id INT AUTO_INCREMENT PRIMARY KEY,
       name varchar(255) NOT NULL,
-      type ENUM('blob', 'tree') NOT NULL 
+      type INT NOT NULL,
+      
     );`,
 	}
 
