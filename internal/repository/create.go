@@ -9,17 +9,17 @@ import (
 	"github.com/mana-sg/vcs/pkg/models"
 )
 
-func CreateRepo(db db.DbHandler, name string) error {
+func CreateRepo(db db.DbHandler, name string, userId string) error {
 	if strings.Compare(name, "") == 0 {
 		return fmt.Errorf("name cannot be empty")
 	}
-	repos, err := GetAllRepos(db)
+	repos, err := GetAllRepositoriesForUser(db, userId)
 	if err != nil {
 		return err
 	}
 
 	for _, repo := range repos {
-		if strings.Compare(repo.name, name) == 0 {
+		if strings.Compare(repo.Name, name) == 0 {
 			return fmt.Errorf("cannot create repository with same name, please use another unique name")
 		}
 	}

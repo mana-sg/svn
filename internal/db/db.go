@@ -8,7 +8,7 @@ import (
 )
 
 type DbHandler struct {
-	db *sql.DB
+	Db *sql.DB
 }
 
 func (d *DbHandler) ConfigDB(user, password, host, dbname string) error {
@@ -29,13 +29,13 @@ func (d *DbHandler) ConfigDB(user, password, host, dbname string) error {
 	if err := db.Ping(); err != nil {
 		return fmt.Errorf("error pinging database: %v", err)
 	}
-	d.db = db
+	d.Db = db
 
 	return nil
 }
 
 func (d *DbHandler) Close() error {
-	err := d.db.Close()
+	err := d.Db.Close()
 	if err != nil {
 		return fmt.Errorf("error closing database: %v", err)
 	}
@@ -43,7 +43,7 @@ func (d *DbHandler) Close() error {
 }
 
 func (d *DbHandler) SetValue(query string, args ...interface{}) (sql.Result, error) {
-	res, err := d.db.Exec(query, args)
+	res, err := d.Db.Exec(query, args)
 	if err != nil {
 		return nil, fmt.Errorf("error inserting values: %v", err)
 	}
@@ -51,7 +51,7 @@ func (d *DbHandler) SetValue(query string, args ...interface{}) (sql.Result, err
 }
 
 func (d *DbHandler) GetValue(query string, args ...interface{}) (*sql.Rows, error) {
-	res, err := d.db.Query(query, args...)
+	res, err := d.Db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error getting the value: %v", err)
 	}
@@ -61,13 +61,13 @@ func (d *DbHandler) GetValue(query string, args ...interface{}) (*sql.Rows, erro
 func (d *DbHandler) PrepareDb() error {
 	createDbQuery := "CREATE DATABASE IF NOT EXISTS vcs"
 
-	_, err := d.db.Exec(createDbQuery)
+	_, err := d.Db.Exec(createDbQuery)
 
 	if err != nil {
 		return fmt.Errorf("error creating database: %s", err)
 	}
 
-	_, err = d.db.Exec("USE vcs")
+	_, err = d.Db.Exec("USE vcs")
 	if err != nil {
 		return fmt.Errorf("error selecting database: %s", err)
 	}
@@ -84,34 +84,42 @@ func (d *DbHandler) PrepareDb() error {
       message VARCHAR(255) NOT NULL,
       timeStamp DATETIME NOT NULL
       repoId INT NOT NULL,
-      FOREIGN KEY (repoId) REFERENCES vcs.repo(id)
+      FOREIGN KEY (repoId) REFERENCES vcs.repo(id),
+      parentCommitId INT,
+      FOREIGN KEY (parentCommitId) REFERENCES vcs.commit(id)
     );`,
 		`CREATE TABLE IF NOT EXISTS repo(
       id INT AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
       timeCreation DATETIME NOT NULL 
-      userId INT,
+      userId INT NOT NULL,
       FOREIGN KEY (userId) REFERENCES vcs.users(id)
     );`,
 		`CREATE TABLE IF NOT EXISTS tree(
       hash VARCHAR(64) NOT NULL PRIMARY KEY 
-      tree_entry VARCHAR(64) NOT NULL,
-      FOREIGN KEY (tree_entry) references vcs.tree_entry(hash)
+      pointsToCommit INT NOT NULL,
+      FOREIGN KEY (pointsToCommit) REFERENCES vcs.commit(id)
     );`,
 		`CREATE TABLE IF NOT EXISTS blobContent(
       hash VARCHAR(64) NOT NULL PRIMARY KEY,
       content BLOB NOT NULL
+      
     );`,
 		`CREATE TABLE IF NOT EXISTS tree_entry(
       id INT AUTO_INCREMENT PRIMARY KEY,
       name varchar(255) NOT NULL,
       type INT NOT NULL,
-      
+      parentTreeId VARCHAR(64) NOT NULL,
+      childBlobId VARCHAR(64),
+      childTreeId VARCHAR(64),
+      FOREIGN KEY (parentTreeId) REFERENCES vcs.tree(hash),
+      FOREIGN KEY (childBlobId) REFERENCES vcs.blobContent(hash),
+      FOREIGN KEY (childTreeId) REFERENCES vcs.tree(hash)
     );`,
 	}
 
 	for _, query := range createTablesQuery {
-		_, err = d.db.Exec(query)
+		_, err = d.Db.Exec(query)
 
 		if err != nil {
 			return fmt.Errorf("error creating tables: %s", err)
