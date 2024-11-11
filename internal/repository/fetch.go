@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"fmt"
 
 	"github.com/mana-sg/vcs/internal/db"
@@ -18,6 +19,14 @@ type Commit struct {
 	TimeStamp      string `json:"timeStamp"`
 	RepoID         int    `json:"repoId"`
 	ParentCommitID *int   `json:"parentCommitId"`
+}
+
+type FileNode struct {
+	Id       int8       `json:"id"`
+	Name     string     `json:"name"`
+	Type     int8       `json:"type"`
+	Children []FileNode `json:"children"`
+	Content  string     `json:"content"`
 }
 
 func GetAllRepositoriesForUser(db db.DbHandler, userId string) ([]Repo, error) {
@@ -80,8 +89,90 @@ func GetAllCommitsForRepo(db db.DbHandler, repoId string) ([]Commit, error) {
 	return commits, nil
 }
 
-func GetAllFilesForCommit(db db.DbHandler, commitId string) ([]File, error) {
-	var files []File
+func GetAllFilesForCommit(db db.DbHandler, commitId int) ([]FileNode, error) {
+	var files []FileNode
+
+	// Step 1: Get the root tree hash for the given commitId
+	queryRoot := "SELECT hash FROM vcs.tree WHERE pointsToCommit=?"
+	var rootHash string
+	row, err := db.GetValue(queryRoot, commitId)
+	if err != nil {
+		return nil, err
+	}
+	defer row.Close()
+	row.Next()
+	row.Scan(&rootHash)
+
+	// Step 2: Build the file tree from the root tree hash
+	files, err = buildFileTree(db, rootHash)
+	if err != nil {
+		return nil, err
+	}
 
 	return files, nil
+}
+
+func buildFileTree(db db.DbHandler, treeHash string) ([]FileNode, error) {
+	var nodes []FileNode
+
+	// Step 3: Get the tree entries for this tree
+	query := "SELECT id, name, type, childBlobId, childTreeId FROM vcs.tree_entry WHERE parentTreeId=?"
+	rows, err := db.GetValue(query, treeHash)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var name string
+		var typeInt int
+		var childBlobId, childTreeId sql.NullString
+		var id int8
+
+		// Read the tree entry details
+		err := rows.Scan(&id, &name, &typeInt, &childBlobId, &childTreeId)
+		if err != nil {
+			return nil, err
+		}
+
+		// Create the FileNode
+		node := FileNode{
+			Id:       int8(id),
+			Type:     int8(typeInt),
+			Name:     name,
+			Children: nil, // To be filled recursively if the node is a directory
+			Content:  "",  // To be filled if it's a file
+		}
+
+		// Step 4: If it's a directory (type == 1), recursively fetch its children
+		if typeInt == 2 { // Directory
+			if childTreeId.String != "" {
+				// Recursive call for directory
+				node.Children, err = buildFileTree(db, childTreeId.String)
+				if err != nil {
+					return nil, err
+				}
+			}
+		} else if typeInt == 1 { // File
+			if childBlobId.String != "" {
+				// Get the file content from blobContent
+				contentQuery := "SELECT content FROM vcs.blobContent WHERE hash=?"
+				var content []byte
+				row, err := db.GetValue(contentQuery, childBlobId.String)
+				if err != nil {
+					return nil, err
+				}
+				defer row.Close()
+				row.Next()
+				row.Scan(&content)
+
+				node.Content = string(content)
+			}
+		}
+
+		// Add the node to the list of nodes
+		nodes = append(nodes, node)
+	}
+
+	return nodes, nil
 }
