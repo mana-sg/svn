@@ -43,7 +43,7 @@ func (d *DbHandler) Close() error {
 }
 
 func (d *DbHandler) SetValue(query string, args ...interface{}) (sql.Result, error) {
-	res, err := d.Db.Exec(query, args)
+	res, err := d.Db.Exec(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error inserting values: %v", err)
 	}
@@ -79,6 +79,13 @@ func (d *DbHandler) PrepareDb() error {
       email VARCHAR(255) NOT NULL UNIQUE,
       password VARCHAR(255) NOT NULL
     );`,
+		`CREATE TABLE IF NOT EXISTS repo(
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      timeCreation DATETIME NOT NULL, 
+      userId INT NOT NULL,
+      FOREIGN KEY (userId) REFERENCES vcs.users(id)
+    );`,
 		`CREATE TABLE IF NOT EXISTS commit(
       id INT AUTO_INCREMENT PRIMARY KEY,
       message VARCHAR(255) NOT NULL,
@@ -87,13 +94,6 @@ func (d *DbHandler) PrepareDb() error {
       FOREIGN KEY (repoId) REFERENCES vcs.repo(id),
       parentCommitId INT,
       FOREIGN KEY (parentCommitId) REFERENCES vcs.commit(id)
-    );`,
-		`CREATE TABLE IF NOT EXISTS repo(
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      timeCreation DATETIME NOT NULL, 
-      userId INT NOT NULL,
-      FOREIGN KEY (userId) REFERENCES vcs.users(id)
     );`,
 		`CREATE TABLE IF NOT EXISTS tree(
       hash VARCHAR(64) NOT NULL PRIMARY KEY,

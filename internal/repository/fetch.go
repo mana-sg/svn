@@ -64,8 +64,9 @@ func GetAllCommitsForRepo(db db.DbHandler, repoId string) ([]Commit, error) {
 	if err != nil {
 		return nil, fmt.Errorf(err.Error())
 	}
-	defer row.Close()
+	row.Next()
 	row.Scan(&lastCommit.ID, &lastCommit.Message, &lastCommit.TimeStamp, &lastCommit.RepoID, &lastCommit.ParentCommitID)
+	row.Close()
 
 	for {
 		commits = append(commits, lastCommit)
@@ -78,12 +79,13 @@ func GetAllCommitsForRepo(db db.DbHandler, repoId string) ([]Commit, error) {
       FROM vcs.commit 
       WHERE id=?
     `
-		row, err := db.GetValue(queryPrevCommit, lastCommit.ParentCommitID)
-		defer row.Close()
+		nextRow, err := db.GetValue(queryPrevCommit, lastCommit.ParentCommitID)
+		defer nextRow.Close()
 		if err != nil {
 			return nil, fmt.Errorf(err.Error())
 		}
-		row.Scan(&lastCommit.ID, &lastCommit.Message, &lastCommit.TimeStamp, &lastCommit.RepoID, &lastCommit.ParentCommitID)
+		nextRow.Next()
+		nextRow.Scan(&lastCommit.ID, &lastCommit.Message, &lastCommit.TimeStamp, &lastCommit.RepoID, &lastCommit.ParentCommitID)
 	}
 
 	return commits, nil

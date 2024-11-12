@@ -13,6 +13,7 @@ import (
 	"github.com/mana-sg/vcs/internal/db"
 	"github.com/mana-sg/vcs/internal/repository"
 	"github.com/mana-sg/vcs/internal/user"
+	"github.com/mana-sg/vcs/pkg/models"
 	"github.com/rs/cors"
 )
 
@@ -58,6 +59,8 @@ func FetchRepos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println(repos)
+
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(repos); err != nil {
 		http.Error(w, "Error encoding reponse", http.StatusInternalServerError)
@@ -67,6 +70,7 @@ func FetchRepos(w http.ResponseWriter, r *http.Request) {
 func FetchCommits(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	repoId := vars["repoId"]
+	fmt.Println(repoId)
 
 	commits, err := repository.GetAllCommitsForRepo(VarDb, repoId)
 	if err != nil {
@@ -123,11 +127,29 @@ func SignUpUser(w http.ResponseWriter, r *http.Request) {
 	err := user.CreateUser(VarDb, varUser.Name, varUser.Email, varUser.Password, varUser.ConfirmPassword)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		fmt.Println(err.Error())
 		return
 	}
 
+	userId, _ := models.GetActiveUser()
+	response := struct {
+		Message string `json:"message"`
+		UserID  uint   `json:"userId"`
+	}{
+		Message: "User registration successful",
+		UserID:  userId,
+	}
+
+	// Set the content-type to application/json
+	w.Header().Set("Content-Type", "application/json")
+	// Set the status code to 201 Created
 	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintln(w, "User registration succesfull")
+	// Send the response as JSON
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
+	fmt.Println(w)
 }
 
 func LoginUser(w http.ResponseWriter, r *http.Request) {
@@ -142,7 +164,23 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	userId, _ := models.GetActiveUser()
+	response := struct {
+		Message string `json:"message"`
+		UserID  uint   `json:"userId"`
+	}{
+		Message: "User login successful",
+		UserID:  userId,
+	}
 
+	// Set the content-type to application/json
+	w.Header().Set("Content-Type", "application/json")
+	// Set the status code to 201 Created
 	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintln(w, "User log in succesfull")
+	// Send the response as JSON
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
+	fmt.Println(w)
 }

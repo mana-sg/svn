@@ -41,6 +41,7 @@ func LogIn(db db.DbHandler, email string, password string) error {
 	var userId uint
 	var name, passwordRes string
 
+	rows.Next()
 	if err = rows.Scan(&userId, &name, &passwordRes); err != nil {
 		return fmt.Errorf("error retrieving data: %v", err)
 	}
