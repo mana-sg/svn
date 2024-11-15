@@ -44,6 +44,7 @@ func main() {
 	r.HandleFunc("/api/fetchCommits/{repoId}", FetchCommits).Methods("GET")
 	r.HandleFunc("/api/fetchFiles/{commitId}", FetchFiles).Methods("GET")
 	r.HandleFunc("/api/createRepo", CreateRepository).Methods("POST")
+	r.HandleFunc("/api/print", PrintRandom).Methods("GET")
 
 	handler := cors.Default().Handler(r)
 
@@ -220,4 +221,8 @@ func CreateRepository(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
+}
+
+func PrintRandom(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("Hello"))
 }
