@@ -103,7 +103,6 @@ func (d *DbHandler) PrepareDb() error {
 		`CREATE TABLE IF NOT EXISTS blobContent(
       hash VARCHAR(64) NOT NULL PRIMARY KEY,
       content BLOB NOT NULL
-      
     );`,
 		`CREATE TABLE IF NOT EXISTS tree_entry(
       id INT AUTO_INCREMENT PRIMARY KEY,

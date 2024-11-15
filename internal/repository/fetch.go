@@ -178,3 +178,7 @@ func buildFileTree(db db.DbHandler, treeHash string) ([]FileNode, error) {
 
 	return nodes, nil
 }
+
+func GetLatestCommit(userId int, repoId int) {
+
+}

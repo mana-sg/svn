@@ -43,6 +43,7 @@ func main() {
 	r.HandleFunc("/api/fetchRepos/{userId}", FetchRepos).Methods("GET")
 	r.HandleFunc("/api/fetchCommits/{repoId}", FetchCommits).Methods("GET")
 	r.HandleFunc("/api/fetchFiles/{commitId}", FetchFiles).Methods("GET")
+	r.HandleFunc("/api/createRepo", CreateRepository).Methods("POST")
 
 	handler := cors.Default().Handler(r)
 
@@ -182,5 +183,41 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
-	fmt.Println(w)
+}
+
+type RepoCreation struct {
+	UserId   int    `json:"userId"`
+	RepoName string `json:"repoName"`
+}
+
+func CreateRepository(w http.ResponseWriter, r *http.Request) {
+	var repo RepoCreation
+
+	if err := json.NewDecoder(r.Body).Decode(&repo); err != nil {
+		http.Error(w, "Invalid Input", http.StatusBadRequest)
+		return
+	}
+
+	err := repository.CreateRepo(VarDb, repo.RepoName, fmt.Sprintf("%d", repo.UserId))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	repoId, _ := models.GetActiveRepo()
+
+	response := struct {
+		RepoId  uint   `json:"repoId"`
+		Message string `json:"message"`
+	}{
+		RepoId:  repoId,
+		Message: "Repository created succesfully",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }

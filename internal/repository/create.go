@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,9 +25,13 @@ func CreateRepo(db db.DbHandler, name string, userId string) error {
 		}
 	}
 
-	createRepoQuery := "INSERT INTO vcs.repo(name, timeCreation) VALUES(?, ?)"
+	createRepoQuery := "INSERT INTO vcs.repo(name, timeCreation, userId) VALUES(?, ?, ?)"
 
-	res, err := db.SetValue(createRepoQuery, name, time.Now().UnixMicro())
+	userIdnum, err := strconv.Atoi(userId)
+	if err != nil {
+		return fmt.Errorf("error converting userId to int")
+	}
+	res, err := db.SetValue(createRepoQuery, name, time.Now(), userIdnum)
 	if err != nil {
 		return fmt.Errorf("error inserting into repo")
 	}
