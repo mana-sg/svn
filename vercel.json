@@ -1,3 +1,7 @@
 {
-  "buildCommand": "go build cmd/main/server.go"
+  "build": {
+    "env": {
+      "GO_BUILD_FLAGS": "-ldflags '-s -w'"
+    }
+  }
 }

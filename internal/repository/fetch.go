@@ -179,6 +179,30 @@ func buildFileTree(db db.DbHandler, treeHash string) ([]FileNode, error) {
 	return nodes, nil
 }
 
-func GetLatestCommit(userId int, repoId int) {
+func GetLatestCommit(db db.DbHandler, userId int, repoId int) (int, error) {
+	queryStringLatestCommit := `
+		SELECT c.id 
+		FROM vcs.commit c
+		JOIN vcs.repo r ON c.repoId = r.id
+		WHERE r.userId = ? AND r.id = ?
+		ORDER BY c.timeStamp DESC
+		LIMIT 1;
+	`
 
+	rows, err := db.GetValue(queryStringLatestCommit, userId, repoId)
+	if err != nil {
+		return 0, fmt.Errorf("failed to execute query: %v", err)
+	}
+	defer rows.Close()
+
+	var commitId int
+	if rows.Next() {
+		if err := rows.Scan(&commitId); err != nil {
+			return 0, fmt.Errorf("failed to scan commit ID: %v", err)
+		}
+	} else {
+		return 0, fmt.Errorf("no commits found for user %d in repo %d", userId, repoId)
+	}
+
+	return commitId, nil
 }

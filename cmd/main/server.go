@@ -44,7 +44,7 @@ func main() {
 	r.HandleFunc("/api/fetchCommits/{repoId}", FetchCommits).Methods("GET")
 	r.HandleFunc("/api/fetchFiles/{commitId}", FetchFiles).Methods("GET")
 	r.HandleFunc("/api/createRepo", CreateRepository).Methods("POST")
-	r.HandleFunc("/api/print", PrintRandom).Methods("GET")
+	r.HandleFunc("/api/fetchLatestCommitId/{repoId}", FetchLatestCommitId).Methods("GET")
 
 	handler := cors.Default().Handler(r)
 
@@ -61,9 +61,8 @@ func FetchRepos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println(repos)
-
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(repos); err != nil {
 		http.Error(w, "Error encoding reponse", http.StatusInternalServerError)
 	}
@@ -72,7 +71,6 @@ func FetchRepos(w http.ResponseWriter, r *http.Request) {
 func FetchCommits(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	repoId := vars["repoId"]
-	fmt.Println(repoId)
 
 	commits, err := repository.GetAllCommitsForRepo(VarDb, repoId)
 	if err != nil {
@@ -80,8 +78,36 @@ func FetchCommits(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(commits); err != nil {
 		http.Error(w, "Error encoding response", http.StatusInternalServerError)
+	}
+}
+
+func FetchLatestCommitId(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	repoId := vars["repoId"]
+
+	repoIdNum, err := strconv.Atoi(repoId)
+	if err != nil {
+		http.Error(w, "Ivalid repository id", http.StatusBadRequest)
+		return
+	}
+
+	userId, _ := models.GetActiveUser()
+	commitId, err := repository.GetLatestCommit(VarDb, int(userId), repoIdNum)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(struct {
+		CommitId int `json:"commitId"`
+	}{CommitId: commitId}); err != nil {
+		http.Error(w, "Error encoding data", http.StatusInternalServerError)
 	}
 }
 
@@ -101,10 +127,10 @@ func FetchFiles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(files); err != nil {
 		http.Error(w, "Error encoding response", http.StatusInternalServerError)
 	}
-
 }
 
 type UserSignUp struct {
@@ -221,8 +247,4 @@ func CreateRepository(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
-}
-
-func PrintRandom(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Hello"))
 }
