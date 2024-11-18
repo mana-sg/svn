@@ -218,6 +218,7 @@ type RepoCreation struct {
 }
 
 func CreateRepository(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("hello1")
 	var repo RepoCreation
 
 	if err := json.NewDecoder(r.Body).Decode(&repo); err != nil {
