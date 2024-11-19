@@ -5,12 +5,13 @@ import (
 	"fmt"
 
 	"github.com/mana-sg/vcs/internal/db"
+	"github.com/mana-sg/vcs/pkg/types"
 )
 
 type Repo struct {
-	ID           int    `json:"id"`
-	Name         string `json:"name"`
-	TimeCreation string `json:"time_creation"`
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	CommitCount int    `json:"commitCount"`
 }
 
 type Commit struct {
@@ -21,16 +22,13 @@ type Commit struct {
 	ParentCommitID *int   `json:"parentCommitId"`
 }
 
-type FileNode struct {
-	Id       int8       `json:"id"`
-	Name     string     `json:"name"`
-	Type     int8       `json:"type"`
-	Children []FileNode `json:"children"`
-	Content  string     `json:"content"`
-}
-
 func GetAllRepositoriesForUser(db db.DbHandler, userId string) ([]Repo, error) {
-	queryString := "SELECT id, name, timeCreation FROM vcs.repo where userId = ?"
+	queryString := `SELECT repo.id, repo.name, COUNT(commit.id) AS commit_count
+    FROM vcs.repo AS repo
+    LEFT JOIN vcs.commit AS commit ON repo.id = commit.repoId
+    WHERE repo.userId = ?
+    GROUP BY repo.id;
+  `
 	rows, err := db.GetValue(queryString, userId)
 	if err != nil {
 		return nil, fmt.Errorf("query error: %v", err)
@@ -41,13 +39,32 @@ func GetAllRepositoriesForUser(db db.DbHandler, userId string) ([]Repo, error) {
 
 	for rows.Next() {
 		var repo Repo
-		if err := rows.Scan(&repo.ID, &repo.Name, &repo.TimeCreation); err != nil {
+		if err := rows.Scan(&repo.ID, &repo.Name, &repo.CommitCount); err != nil {
 			return nil, fmt.Errorf("error scanning row: %v", err)
 		}
 		repos = append(repos, repo)
 	}
 
 	return repos, nil
+}
+
+func GetNumberOfrepositories(db db.DbHandler, userId string) (int, error) {
+	var numberOfRepos int
+	query := `
+    SELECT COUNT(*) AS repo_count
+    FROM vcs.repo
+    WHERE userId = ?;
+  `
+	row, err := db.GetValue(query, userId)
+	if err != nil {
+		return 0, fmt.Errorf(err.Error())
+	}
+
+	row.Next()
+	row.Scan(&numberOfRepos)
+	row.Close()
+
+	return numberOfRepos, nil
 }
 
 func GetAllCommitsForRepo(db db.DbHandler, repoId string) ([]Commit, error) {
@@ -91,11 +108,11 @@ func GetAllCommitsForRepo(db db.DbHandler, repoId string) ([]Commit, error) {
 	return commits, nil
 }
 
-func GetAllFilesForCommit(db db.DbHandler, commitId int) ([]FileNode, error) {
-	var files []FileNode
+func GetAllFilesForCommit(db db.DbHandler, commitId int) ([]types.FileNode, error) {
+	var files []types.FileNode
 
 	// Step 1: Get the root tree hash for the given commitId
-	queryRoot := "SELECT hash FROM vcs.tree WHERE pointsToCommit=?"
+	queryRoot := "SELECT referencesTree FROM vcs.commit WHERE id=?"
 	var rootHash string
 	row, err := db.GetValue(queryRoot, commitId)
 	if err != nil {
@@ -114,8 +131,8 @@ func GetAllFilesForCommit(db db.DbHandler, commitId int) ([]FileNode, error) {
 	return files, nil
 }
 
-func buildFileTree(db db.DbHandler, treeHash string) ([]FileNode, error) {
-	var nodes []FileNode
+func buildFileTree(db db.DbHandler, treeHash string) ([]types.FileNode, error) {
+	var nodes []types.FileNode
 
 	// Step 3: Get the tree entries for this tree
 	query := "SELECT id, name, type, childBlobId, childTreeId FROM vcs.tree_entry WHERE parentTreeId=?"
@@ -138,7 +155,7 @@ func buildFileTree(db db.DbHandler, treeHash string) ([]FileNode, error) {
 		}
 
 		// Create the FileNode
-		node := FileNode{
+		node := types.FileNode{
 			Id:       int8(id),
 			Type:     int8(typeInt),
 			Name:     name,
@@ -146,7 +163,7 @@ func buildFileTree(db db.DbHandler, treeHash string) ([]FileNode, error) {
 			Content:  "",  // To be filled if it's a file
 		}
 
-		// Step 4: If it's a directory (type == 1), recursively fetch its children
+		// Step 4: If it's a directory (type == 2), recursively fetch its children
 		if typeInt == 2 { // Directory
 			if childTreeId.String != "" {
 				// Recursive call for directory

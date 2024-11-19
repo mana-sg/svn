@@ -13,14 +13,16 @@ import (
 	"github.com/mana-sg/vcs/internal/db"
 	"github.com/mana-sg/vcs/internal/repository"
 	"github.com/mana-sg/vcs/internal/user"
+	"github.com/mana-sg/vcs/internal/utils"
 	"github.com/mana-sg/vcs/pkg/models"
+	"github.com/mana-sg/vcs/pkg/types"
 	"github.com/rs/cors"
 )
 
 var VarDb db.DbHandler
 
 func main() {
-	godotenv.Load("../../.env")
+	godotenv.Load("../.env")
 	user := os.Getenv("DATABASE_USER")
 	password := os.Getenv("DATABASE_PASSWORD")
 	host := os.Getenv("DATABASE_HOST")
@@ -45,10 +47,32 @@ func main() {
 	r.HandleFunc("/api/fetchFiles/{commitId}", FetchFiles).Methods("GET")
 	r.HandleFunc("/api/createRepo", CreateRepository).Methods("POST")
 	r.HandleFunc("/api/fetchLatestCommitId/{repoId}", FetchLatestCommitId).Methods("GET")
+	r.HandleFunc("/api/commit/{repoId}", CreateCommit).Methods("POST")
+	r.HandleFunc("/api/numberOfRepos/{userId}", GetNumRepos).Methods("GET")
 
 	handler := cors.Default().Handler(r)
 
 	http.ListenAndServe(":6969", handler)
+}
+
+func GetNumRepos(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userId := vars["userId"]
+
+	numberOfRepos, err := repository.GetNumberOfrepositories(VarDb, userId)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(struct {
+		ReposNum int `json:"numberOfRepos"`
+	}{
+		ReposNum: numberOfRepos,
+	}); err != nil {
+		http.Error(w, "Error encoding reponse", http.StatusInternalServerError)
+	}
 }
 
 func FetchRepos(w http.ResponseWriter, r *http.Request) {
@@ -96,6 +120,7 @@ func FetchLatestCommitId(w http.ResponseWriter, r *http.Request) {
 
 	userId, _ := models.GetActiveUser()
 	commitId, err := repository.GetLatestCommit(VarDb, int(userId), repoIdNum)
+	fmt.Println(commitId)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -218,7 +243,6 @@ type RepoCreation struct {
 }
 
 func CreateRepository(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("hello1")
 	var repo RepoCreation
 
 	if err := json.NewDecoder(r.Body).Decode(&repo); err != nil {
@@ -247,5 +271,61 @@ func CreateRepository(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
+	}
+}
+
+type Updates struct {
+	Id           int    `json:"id"`
+	Modification string `json:"modification"`
+}
+
+type CreateCommitStruct struct {
+	Commit string           `json:"commit"`
+	Files  []types.FileNode `json:"files"`
+}
+
+func CreateCommit(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	repoId, err := strconv.Atoi(vars["repoId"])
+	if err != nil {
+		http.Error(w, "Invalid repository id", http.StatusBadRequest)
+		return
+	}
+	var files []types.FileNode
+	var commit string
+	var createCommitVar CreateCommitStruct
+
+	if err := json.NewDecoder(r.Body).Decode(&createCommitVar); err != nil {
+		http.Error(w, "Input Invalid", http.StatusBadRequest)
+		return
+	}
+	files = createCommitVar.Files
+	commit = createCommitVar.Commit
+
+	commitId, err := repository.CreateCommit(VarDb, commit, repoId)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	rootDirHash, err := utils.HashDirectoryContents(files)
+	if err != nil {
+		http.Error(w, "Error hashing directory", http.StatusInternalServerError)
+		return
+	}
+	err = repository.AddTree(VarDb, string(rootDirHash), files, commitId)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(struct {
+		Message string `json:"message"`
+	}{
+		Message: "Insertion Succesful",
+	}); err != nil {
+		http.Error(w, "error encoding response", http.StatusInternalServerError)
 	}
 }
