@@ -10,7 +10,7 @@ import (
 	"github.com/mana-sg/vcs/pkg/models"
 )
 
-func CreateRepo(db db.DbHandler, name string, userId string) error {
+func CreateRepo(db db.DbHandler, name string, userId string, access int) error {
 	if strings.Compare(name, "") == 0 {
 		return fmt.Errorf("name cannot be empty")
 	}
@@ -25,13 +25,13 @@ func CreateRepo(db db.DbHandler, name string, userId string) error {
 		}
 	}
 
-	createRepoQuery := "INSERT INTO vcs.repo(name, timeCreation, userId) VALUES(?, ?, ?)"
+	createRepoQuery := "INSERT INTO vcs.repo(name, timeCreation, userId, access) VALUES(?, ?, ?, ?)"
 
 	userIdnum, err := strconv.Atoi(userId)
 	if err != nil {
 		return fmt.Errorf("error converting userId to int")
 	}
-	res, err := db.SetValue(createRepoQuery, name, time.Now(), userIdnum)
+	res, err := db.SetValue(createRepoQuery, name, time.Now(), userIdnum, access)
 	if err != nil {
 		return fmt.Errorf("error inserting into repo")
 	}

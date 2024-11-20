@@ -28,7 +28,6 @@ func CreateCommit(db db.DbHandler, message string, repoId int) (int, error) {
 	//executing the query and getting the error message
 	insertion, err := db.SetValue(createCommitQuery, message, time.Now(), repoId)
 	//Check for any errors in the process
-	fmt.Println(err)
 	if err != nil {
 		return 0, fmt.Errorf("error adding commit: %v", err)
 	}
@@ -96,7 +95,6 @@ func AddTreeEntry(db db.DbHandler, node types.FileNode, parentId string) error {
 		if err != nil {
 			return fmt.Errorf("error updating child blob id")
 		}
-		fmt.Println("i am after update")
 	} else if node.Type == 2 {
 		// If it's a directory, add its subtree
 		err := AddTree(db, string(hash), node.Children, 0)
@@ -130,17 +128,13 @@ func AddTree(db db.DbHandler, dirHash string, children []types.FileNode, commitI
 		// Insert the directory hash into the tree table
 		queryString := "INSERT INTO vcs.tree(hash) VALUES(?)"
 		_, err = db.SetValue(queryString, dirHash)
-		fmt.Println(err)
 		if err != nil {
 			return fmt.Errorf("error inserting tree entry: %v", err)
 		}
 	}
 
-	fmt.Println("here outside for commitId", commitId)
 	if commitId != 0 {
-		fmt.Println("here for commitId", commitId)
 		queryStringUpdate := "UPDATE vcs.commit SET referencesTree=? WHERE id=?"
-		fmt.Println(err)
 		_, err := db.SetValue(queryStringUpdate, dirHash, commitId)
 		if err != nil {
 			fmt.Errorf("error in adding refernce to tree")
@@ -182,29 +176,24 @@ func hashExists(db db.DbHandler, hash string, entryType int8) (bool, error) {
 
 // Helper function to link an existing tree entry without creating a new one
 func linkExistingTreeEntry(db db.DbHandler, node types.FileNode, hash string, childHash string) error {
-	fmt.Println("I am here for node: ", node.Name)
 	queryString := "INSERT INTO vcs.tree_entry(type, name, parentTreeId) VALUES(?, ?, ?)"
 
 	treeEntryInsertion, err := db.SetValue(queryString, node.Type, node.Name, hash)
 	if err != nil {
 		return fmt.Errorf("error inserting tree entry: %v", err)
 	}
-	fmt.Println("got tree_insertion")
 	treeEntryId, err := treeEntryInsertion.LastInsertId()
 	if err != nil {
 		return fmt.Errorf("error getting tree entry id: %v", err)
 	}
-	fmt.Println("here with tree_entry id", treeEntryId)
 
 	if node.Type == 1 {
 		// If it's a file, insert the content into blobContent
 		linkBlobQuery := "UPDATE vcs.tree_entry SET childBlobId=? WHERE id = ?"
 		_, err := db.SetValue(linkBlobQuery, childHash, treeEntryId)
-		fmt.Println(err)
 		if err != nil {
 			return fmt.Errorf("error updating child blob id")
 		}
-		fmt.Println("ok no error")
 	} else if node.Type == 2 {
 		// If it's a directory, add its subtree
 		err := AddTree(db, string(childHash), node.Children, 0)
@@ -217,6 +206,5 @@ func linkExistingTreeEntry(db db.DbHandler, node types.FileNode, hash string, ch
 			return fmt.Errorf("error updating child tree id")
 		}
 	}
-	fmt.Println("returning from linking")
 	return nil
 }

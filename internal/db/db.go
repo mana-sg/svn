@@ -83,6 +83,7 @@ func (d *DbHandler) PrepareDb() error {
       id INT AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
       timeCreation DATETIME NOT NULL, 
+      access INT NOT NULL, 
       userId INT NOT NULL,
       FOREIGN KEY (userId) REFERENCES vcs.users(id)
     );`,

@@ -46,13 +46,32 @@ func main() {
 	r.HandleFunc("/api/fetchCommits/{repoId}", FetchCommits).Methods("GET")
 	r.HandleFunc("/api/fetchFiles/{commitId}", FetchFiles).Methods("GET")
 	r.HandleFunc("/api/createRepo", CreateRepository).Methods("POST")
-	r.HandleFunc("/api/fetchLatestCommitId/{repoId}", FetchLatestCommitId).Methods("GET")
+	r.HandleFunc("/api/fetchLatestCommitId/{userId}/{repoId}", FetchLatestCommitId).Methods("GET")
 	r.HandleFunc("/api/commit/{repoId}", CreateCommit).Methods("POST")
 	r.HandleFunc("/api/numberOfRepos/{userId}", GetNumRepos).Methods("GET")
+	r.HandleFunc("/api/fetchAllRepos/{userId}", FetchAllRepos).Methods("GET")
 
 	handler := cors.Default().Handler(r)
 
 	http.ListenAndServe(":6969", handler)
+}
+
+func FetchAllRepos(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userId := vars["userId"]
+
+	repos, err := repository.GetAllRepositories(VarDb, userId)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(repos); err != nil {
+		http.Error(w, "Error encoding response!", http.StatusInternalServerError)
+	}
 }
 
 func GetNumRepos(w http.ResponseWriter, r *http.Request) {
@@ -111,6 +130,7 @@ func FetchCommits(w http.ResponseWriter, r *http.Request) {
 func FetchLatestCommitId(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	repoId := vars["repoId"]
+	userId := vars["userId"]
 
 	repoIdNum, err := strconv.Atoi(repoId)
 	if err != nil {
@@ -118,9 +138,8 @@ func FetchLatestCommitId(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId, _ := models.GetActiveUser()
-	commitId, err := repository.GetLatestCommit(VarDb, int(userId), repoIdNum)
-	fmt.Println(commitId)
+	// userId, _ := models.GetActiveUser()
+	commitId, err := repository.GetLatestCommit(VarDb, userId, repoIdNum)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -180,7 +199,6 @@ func SignUpUser(w http.ResponseWriter, r *http.Request) {
 	err := user.CreateUser(VarDb, varUser.Name, varUser.Email, varUser.Password, varUser.ConfirmPassword)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		fmt.Println(err.Error())
 		return
 	}
 
@@ -202,7 +220,6 @@ func SignUpUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
-	fmt.Println(w)
 }
 
 func LoginUser(w http.ResponseWriter, r *http.Request) {
@@ -240,6 +257,7 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 type RepoCreation struct {
 	UserId   int    `json:"userId"`
 	RepoName string `json:"repoName"`
+	Access   int    `json:"access"`
 }
 
 func CreateRepository(w http.ResponseWriter, r *http.Request) {
@@ -250,7 +268,7 @@ func CreateRepository(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := repository.CreateRepo(VarDb, repo.RepoName, fmt.Sprintf("%d", repo.UserId))
+	err := repository.CreateRepo(VarDb, repo.RepoName, fmt.Sprintf("%d", repo.UserId), repo.Access)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

@@ -12,6 +12,8 @@ type Repo struct {
 	ID          int    `json:"id"`
 	Name        string `json:"name"`
 	CommitCount int    `json:"commitCount"`
+	UserId      int    `json:"userId"`
+	UserName    string `json:"userName"`
 }
 
 type Commit struct {
@@ -22,12 +24,48 @@ type Commit struct {
 	ParentCommitID *int   `json:"parentCommitId"`
 }
 
-func GetAllRepositoriesForUser(db db.DbHandler, userId string) ([]Repo, error) {
-	queryString := `SELECT repo.id, repo.name, COUNT(commit.id) AS commit_count
+func GetAllRepositories(db db.DbHandler, userId string) ([]Repo, error) {
+	var repos []Repo
+
+	queryString := `
+    SELECT 
+        repo.id AS repoId, 
+        repo.name AS repoName, 
+        repo.userId AS userId, 
+        users.name AS userName, 
+        (SELECT COUNT(*) 
+        FROM vcs.commit 
+        WHERE repoId = repo.id) AS commitCount
     FROM vcs.repo AS repo
-    LEFT JOIN vcs.commit AS commit ON repo.id = commit.repoId
+    JOIN vcs.users AS users ON repo.userId = users.id
+    WHERE repo.userId != ?
+    AND repo.access = 1;
+  `
+	rows, err := db.GetValue(queryString, userId)
+	if err != nil {
+		return nil, fmt.Errorf("query error: %v", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var repo Repo
+		if err := rows.Scan(&repo.ID, &repo.Name, &repo.UserId, &repo.UserName, &repo.CommitCount); err != nil {
+			return nil, fmt.Errorf("error scanning row: %v", err)
+		}
+		repos = append(repos, repo)
+	}
+
+	return repos, nil
+}
+
+func GetAllRepositoriesForUser(db db.DbHandler, userId string) ([]Repo, error) {
+	queryString := `
+    SELECT repo.id AS repoId, repo.name AS repoName, repo.userId as userId, 
+          (SELECT COUNT(*) 
+            FROM vcs.commit 
+            WHERE repoId = repo.id) AS commitCount
+    FROM vcs.repo AS repo
     WHERE repo.userId = ?
-    GROUP BY repo.id;
   `
 	rows, err := db.GetValue(queryString, userId)
 	if err != nil {
@@ -39,7 +77,7 @@ func GetAllRepositoriesForUser(db db.DbHandler, userId string) ([]Repo, error) {
 
 	for rows.Next() {
 		var repo Repo
-		if err := rows.Scan(&repo.ID, &repo.Name, &repo.CommitCount); err != nil {
+		if err := rows.Scan(&repo.ID, &repo.Name, &repo.UserId, &repo.CommitCount); err != nil {
 			return nil, fmt.Errorf("error scanning row: %v", err)
 		}
 		repos = append(repos, repo)
@@ -196,7 +234,7 @@ func buildFileTree(db db.DbHandler, treeHash string) ([]types.FileNode, error) {
 	return nodes, nil
 }
 
-func GetLatestCommit(db db.DbHandler, userId int, repoId int) (int, error) {
+func GetLatestCommit(db db.DbHandler, userId string, repoId int) (int, error) {
 	queryStringLatestCommit := `
 		SELECT c.id 
 		FROM vcs.commit c
